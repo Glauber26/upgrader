@@ -38,6 +38,9 @@ dependencies:
   # Pure Dart library for HTML5 parsing
   html: ^0.15.0
 
+  # Goole fonts
+  google_fonts: ^2.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

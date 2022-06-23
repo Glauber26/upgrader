@@ -2,6 +2,8 @@
  * Copyright (c) 2019-2022 Larry Aasen. All rights reserved.
  */
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:upgrader/upgrader.dart';
 
@@ -27,10 +29,19 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Upgrader Example',
       home: Scaffold(
-          appBar: AppBar(title: Text('Upgrader Example')),
-          body: UpgradeAlert(
-            child: Center(child: Text('Checking...')),
-          )),
+        appBar: AppBar(title: Text('Upgrader Example')),
+        body: UpgradeAlert(
+          upgrader: Upgrader(
+            debugDisplayAlways: true,
+            debugLogging: true,
+            countryCode: 'BR',
+            showReleaseNotes: true,
+            messages: UpgraderMessages(code: 'pt'),
+            dialogStyle: Platform.isIOS ? UpgradeDialogStyle.cupertino : UpgradeDialogStyle.material,
+          ),
+          child: Center(child: Text('Checking...')),
+        ),
+      ),
     );
   }
 }

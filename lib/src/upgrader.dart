@@ -12,6 +12,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:version/version.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'appcast.dart';
 import 'itunes_search_api.dart';
@@ -28,10 +29,7 @@ typedef VoidBoolCallback = void Function(bool value);
 /// Signature of callback for willDisplayUpgrade. Includes display,
 /// minAppVersion, installedVersion, and appStoreVersion.
 typedef WillDisplayUpgradeCallback = void Function(
-    {required bool display,
-    String? minAppVersion,
-    String? installedVersion,
-    String? appStoreVersion});
+    {required bool display, String? minAppVersion, String? installedVersion, String? appStoreVersion});
 
 /// There are two different dialog styles: Cupertino and Material
 enum UpgradeDialogStyle { cupertino, material }
@@ -81,6 +79,30 @@ class Upgrader {
 
   /// The upgrade dialog style. Used only on UpgradeAlert. (default: material)
   UpgradeDialogStyle dialogStyle;
+
+  /// Enable dialog custom forOrbeLog app
+  bool orbeDialogCustom;
+
+  /// Alert text custom for OrbeLog app
+  String? orbeAlertText;
+
+  /// Release notes text custom for OrbeLog app
+  String? releaseNotesCustomName;
+
+  /// Description alert text custom for OrbeLog app
+  String? orbeDescriptionAlertText;
+
+  /// Label button ignore custom for OrbeLog app
+  String? labelIgnoreCustomOrbe;
+
+  /// Label button update now custom for OrbeLog app
+  String? labelUpdateNowCustomOrbe;
+
+  /// Message release notes test for debug OrbeLog app
+  String? msgReleaseNotesTest;
+
+  /// Global context for OrbeLog app
+  BuildContext? globalContext;
 
   /// Duration until alerting user again
   final Duration durationUntilAlertAgain;
@@ -145,8 +167,7 @@ class Upgrader {
   bool _hasAlerted = false;
   bool _isCriticalUpdate = false;
 
-  final notInitializedExceptionMessage =
-      'initialize() not called. Must be called first.';
+  final notInitializedExceptionMessage = 'initialize() not called. Must be called first.';
 
   Upgrader({
     this.appcastConfig,
@@ -169,6 +190,14 @@ class Upgrader {
     this.countryCode,
     this.minAppVersion,
     this.dialogStyle = UpgradeDialogStyle.material,
+    this.orbeDialogCustom = false,
+    this.orbeAlertText = '',
+    this.orbeDescriptionAlertText = '',
+    this.releaseNotesCustomName = '',
+    this.labelIgnoreCustomOrbe = '',
+    this.labelUpdateNowCustomOrbe = '',
+    this.msgReleaseNotesTest = '',
+    this.globalContext,
     TargetPlatform? platform,
   })  : client = client ?? http.Client(),
         messages = messages ?? UpgraderMessages(),
@@ -225,8 +254,7 @@ class Upgrader {
     if (_packageInfo == null) {
       _packageInfo = await PackageInfo.fromPlatform();
       if (debugLogging) {
-        print(
-            'upgrader: package info packageName: ${_packageInfo!.packageName}');
+        print('upgrader: package info packageName: ${_packageInfo!.packageName}');
         print('upgrader: package info appName: ${_packageInfo!.appName}');
         print('upgrader: package info version: ${_packageInfo!.version}');
       }
@@ -253,12 +281,9 @@ class Upgrader {
         print('upgrader: appcast item count: $count');
       }
       final bestItem = appcast.bestItem();
-      if (bestItem != null &&
-          bestItem.versionString != null &&
-          bestItem.versionString!.isNotEmpty) {
+      if (bestItem != null && bestItem.versionString != null && bestItem.versionString!.isNotEmpty) {
         if (debugLogging) {
-          print(
-              'upgrader: appcast best item version: ${bestItem.versionString}');
+          print('upgrader: appcast best item version: ${bestItem.versionString}');
         }
         _appStoreVersion ??= bestItem.versionString;
         _appStoreListingURL ??= bestItem.fileURL;
@@ -285,8 +310,7 @@ class Upgrader {
       } else if (platform == TargetPlatform.iOS) {
         final iTunes = ITunesSearchAPI();
         iTunes.client = client;
-        final response = await (iTunes
-            .lookupByBundleId(_packageInfo!.packageName, country: country));
+        final response = await (iTunes.lookupByBundleId(_packageInfo!.packageName, country: country));
 
         if (response != null) {
           _appStoreVersion ??= ITunesResults.version(response);
@@ -329,9 +353,7 @@ class Upgrader {
   }
 
   bool _isAppcastThisPlatform() {
-    if (appcastConfig == null ||
-        appcastConfig!.url == null ||
-        appcastConfig!.url!.isEmpty) {
+    if (appcastConfig == null || appcastConfig!.url == null || appcastConfig!.url!.isEmpty) {
       return false;
     }
 
@@ -368,20 +390,19 @@ class Upgrader {
   String message() {
     var msg = messages.message(UpgraderMessage.body)!;
     msg = msg.replaceAll('{{appName}}', appName());
-    msg = msg.replaceAll(
-        '{{currentAppStoreVersion}}', currentAppStoreVersion() ?? '');
-    msg = msg.replaceAll(
-        '{{currentInstalledVersion}}', currentInstalledVersion() ?? '');
+    msg = msg.replaceAll('{{currentAppStoreVersion}}', currentAppStoreVersion() ?? '');
+    msg = msg.replaceAll('{{currentInstalledVersion}}', currentInstalledVersion() ?? '');
     return msg;
   }
+
 
   /// Only called by [UpgradeAlert].
   void checkVersion({required BuildContext context}) {
     if (!_displayed) {
+      globalContext = context;
       final shouldDisplay = shouldDisplayUpgrade();
       if (debugLogging) {
-        print(
-            'upgrader: shouldDisplayReleaseNotes: ${shouldDisplayReleaseNotes()}');
+        print('upgrader: shouldDisplayReleaseNotes: ${shouldDisplayReleaseNotes()}');
       }
       if (shouldDisplay) {
         _displayed = true;
@@ -434,10 +455,7 @@ class Upgrader {
     // Call the [willDisplayUpgrade] callback when available.
     if (willDisplayUpgrade != null) {
       willDisplayUpgrade!(
-          display: rv,
-          minAppVersion: minAppVersion,
-          installedVersion: _installedVersion,
-          appStoreVersion: _appStoreVersion);
+          display: rv, minAppVersion: minAppVersion, installedVersion: _installedVersion, appStoreVersion: _appStoreVersion);
     }
 
     return rv;
@@ -472,8 +490,7 @@ class Upgrader {
   }
 
   bool alreadyIgnoredThisVersion() {
-    final rv =
-        _userIgnoredVersion != null && _userIgnoredVersion == _appStoreVersion;
+    final rv = _userIgnoredVersion != null && _userIgnoredVersion == _appStoreVersion;
     if (rv && debugLogging) {
       print('upgrader: alreadyIgnoredThisVersion: true');
     }
@@ -521,10 +538,32 @@ class Upgrader {
       // Get the system locale
       locale = ambiguate(WidgetsBinding.instance)!.window.locale;
     }
-    final code = locale == null || locale.countryCode == null
-        ? 'US'
-        : locale.countryCode;
+    final code = locale == null || locale.countryCode == null ? 'US' : locale.countryCode;
     return code;
+  }
+
+  void showAlertOrbe() {
+    if (!_displayed) {
+      final shouldDisplay = shouldDisplayUpgrade();
+      if (debugLogging) {
+        print('upgrader: shouldDisplayReleaseNotes: ${shouldDisplayReleaseNotes()}');
+      }
+      if (shouldDisplay && globalContext != null) {
+        _displayed = true;
+        Future.delayed(const Duration(milliseconds: 0), () {
+          showDialog(
+            barrierDismissible: canDismissDialog,
+            context: globalContext!,
+            builder: (BuildContext context) {
+              return WillPopScope(
+                onWillPop: () async => _shouldPopScope(),
+                child: _orbeDialogCustom(msgReleaseNotesTest ?? releaseNotes, context),
+              );
+            },
+          );
+        });
+      }
+    }
   }
 
   void _showDialog(
@@ -548,7 +587,9 @@ class Upgrader {
       builder: (BuildContext context) {
         return WillPopScope(
           onWillPop: () async => _shouldPopScope(),
-          child: dialogStyle == UpgradeDialogStyle.material
+          child: orbeDialogCustom
+              ? _orbeDialogCustom(msgReleaseNotesTest ?? releaseNotes, context)
+              : dialogStyle == UpgradeDialogStyle.material
               ? _alertDialog(title!, message, releaseNotes, context)
               : _cupertinoAlertDialog(title!, message, releaseNotes, context),
         );
@@ -574,8 +615,116 @@ class Upgrader {
     return false;
   }
 
-  AlertDialog _alertDialog(String title, String message, String? releaseNotes,
-      BuildContext context) {
+  AlertDialog _orbeDialogCustom(String? releaseNotes, BuildContext context) {
+    Widget? notes;
+    if (releaseNotes != null && releaseNotes != '') {
+      notes = Padding(
+        padding: const EdgeInsets.only(bottom: 15.0, left: 15.0, right: 15.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: <Widget>[
+            Text(
+              releaseNotesCustomName!,
+              style: GoogleFonts.roboto(
+                fontSize: 18.0 * 0.95,
+                color: const Color(0xFF64266C),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text(
+              releaseNotes,
+              maxLines: 15,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+    return AlertDialog(
+      contentPadding: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      content: InkWell(
+        onTap: () {},
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 20),
+                child: Icon(
+                  Icons.info,
+                  color: Color(0xFF64266C),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  orbeAlertText!,
+                  style: GoogleFonts.roboto(
+                    fontSize: 18.0 * 0.95,
+                    color: const Color(0xFF64266C),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Text(
+                      orbeDescriptionAlertText!,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  if (notes != null) notes,
+                ],
+              ),
+              Flexible(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        child: Text(
+                          labelIgnoreCustomOrbe!,
+                          style: GoogleFonts.roboto(
+                            color: const Color(0xFF64266C),
+                          ),
+                        ),
+                        onPressed: () => onUserIgnored(context, true),
+                      ),
+                    ),
+                    const SizedBox(width: 24.0),
+                    Expanded(
+                      child: TextButton(
+                          child: Text(
+                            labelUpdateNowCustomOrbe!,
+                            style: GoogleFonts.roboto(
+                              color: const Color(0xFF64266C),
+                            ),
+                          ),
+                          onPressed: () => onUserUpdated(context, !blocked())),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  AlertDialog _alertDialog(String title, String message, String? releaseNotes, BuildContext context) {
     Widget? notes;
     if (releaseNotes != null) {
       notes = Padding(
@@ -584,8 +733,7 @@ class Upgrader {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(messages.message(UpgraderMessage.releaseNotes)!,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(messages.message(UpgraderMessage.releaseNotes)!, style: const TextStyle(fontWeight: FontWeight.bold)),
               Text(
                 releaseNotes,
                 maxLines: 15,
@@ -602,38 +750,28 @@ class Upgrader {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           Text(message),
-          Padding(
-              padding: const EdgeInsets.only(top: 15.0),
-              child: Text(messages.message(UpgraderMessage.prompt)!)),
+          Padding(padding: const EdgeInsets.only(top: 15.0), child: Text(messages.message(UpgraderMessage.prompt)!)),
           if (notes != null) notes,
         ],
       )),
       actions: <Widget>[
         if (showIgnore)
-          TextButton(
-              child: Text(messages.message(UpgraderMessage.buttonTitleIgnore)!),
-              onPressed: () => onUserIgnored(context, true)),
+          TextButton(child: Text(messages.message(UpgraderMessage.buttonTitleIgnore)!), onPressed: () => onUserIgnored(context, true)),
         if (showLater)
-          TextButton(
-              child: Text(messages.message(UpgraderMessage.buttonTitleLater)!),
-              onPressed: () => onUserLater(context, true)),
-        TextButton(
-            child: Text(messages.message(UpgraderMessage.buttonTitleUpdate)!),
-            onPressed: () => onUserUpdated(context, !blocked())),
+          TextButton(child: Text(messages.message(UpgraderMessage.buttonTitleLater)!), onPressed: () => onUserLater(context, true)),
+        TextButton(child: Text(messages.message(UpgraderMessage.buttonTitleUpdate)!), onPressed: () => onUserUpdated(context, !blocked())),
       ],
     );
   }
 
-  CupertinoAlertDialog _cupertinoAlertDialog(String title, String message,
-      String? releaseNotes, BuildContext context) {
+  CupertinoAlertDialog _cupertinoAlertDialog(String title, String message, String? releaseNotes, BuildContext context) {
     Widget? notes;
     if (releaseNotes != null) {
       notes = Padding(
           padding: const EdgeInsets.only(top: 15.0),
           child: Column(
             children: <Widget>[
-              Text(messages.message(UpgraderMessage.releaseNotes)!,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(messages.message(UpgraderMessage.releaseNotes)!, style: const TextStyle(fontWeight: FontWeight.bold)),
               Text(
                 releaseNotes,
                 maxLines: 14,
@@ -649,21 +787,17 @@ class Upgrader {
         mainAxisAlignment: MainAxisAlignment.start,
         children: <Widget>[
           Text(message),
-          Padding(
-              padding: const EdgeInsets.only(top: 15.0),
-              child: Text(messages.message(UpgraderMessage.prompt)!)),
+          Padding(padding: const EdgeInsets.only(top: 15.0), child: Text(messages.message(UpgraderMessage.prompt)!)),
           if (notes != null) notes,
         ],
       ),
       actions: <Widget>[
         if (showIgnore)
           CupertinoDialogAction(
-              child: Text(messages.message(UpgraderMessage.buttonTitleIgnore)!),
-              onPressed: () => onUserIgnored(context, true)),
+              child: Text(messages.message(UpgraderMessage.buttonTitleIgnore)!), onPressed: () => onUserIgnored(context, true)),
         if (showLater)
           CupertinoDialogAction(
-              child: Text(messages.message(UpgraderMessage.buttonTitleLater)!),
-              onPressed: () => onUserLater(context, true)),
+              child: Text(messages.message(UpgraderMessage.buttonTitleLater)!), onPressed: () => onUserLater(context, true)),
         CupertinoDialogAction(
             isDefaultAction: true,
             child: Text(messages.message(UpgraderMessage.buttonTitleUpdate)!),
@@ -792,8 +926,7 @@ class Upgrader {
 
     if (await canLaunchUrl(Uri.parse(_appStoreListingURL!))) {
       try {
-        await launchUrl(Uri.parse(_appStoreListingURL!),
-            mode: LaunchMode.externalNonBrowserApplication);
+        await launchUrl(Uri.parse(_appStoreListingURL!), mode: LaunchMode.externalNonBrowserApplication);
       } catch (e) {
         if (debugLogging) {
           print('upgrader: launch to app store failed: $e');
