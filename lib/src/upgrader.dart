@@ -101,8 +101,11 @@ class Upgrader {
   /// Message release notes test for debug OrbeLog app
   String? msgReleaseNotesTest;
 
-  /// Global context for OrbeLog app
-  BuildContext? globalContext;
+  /// Function on click update later from Orbelog app
+  Function? orbeActionButton;
+
+  ///Show alert only if variable is true
+  bool showAlert;
 
   /// Duration until alerting user again
   final Duration durationUntilAlertAgain;
@@ -197,7 +200,8 @@ class Upgrader {
     this.labelIgnoreCustomOrbe = '',
     this.labelUpdateNowCustomOrbe = '',
     this.msgReleaseNotesTest = '',
-    this.globalContext,
+    this.orbeActionButton,
+    this.showAlert = false,
     TargetPlatform? platform,
   })  : client = client ?? http.Client(),
         messages = messages ?? UpgraderMessages(),
@@ -395,25 +399,26 @@ class Upgrader {
     return msg;
   }
 
-
   /// Only called by [UpgradeAlert].
   void checkVersion({required BuildContext context}) {
     if (!_displayed) {
-      globalContext = context;
       final shouldDisplay = shouldDisplayUpgrade();
       if (debugLogging) {
         print('upgrader: shouldDisplayReleaseNotes: ${shouldDisplayReleaseNotes()}');
       }
       if (shouldDisplay) {
-        _displayed = true;
-        Future.delayed(const Duration(milliseconds: 0), () {
-          _showDialog(
+        if (showAlert) {
+          _displayed = true;
+          Future.delayed(const Duration(milliseconds: 0), () {
+            _showDialog(
               context: context,
               title: messages.message(UpgraderMessage.title),
               message: message(),
               releaseNotes: shouldDisplayReleaseNotes() ? _releaseNotes : null,
-              canDismissDialog: canDismissDialog);
-        });
+              canDismissDialog: canDismissDialog,
+            );
+          });
+        }
       }
     }
   }
@@ -542,30 +547,6 @@ class Upgrader {
     return code;
   }
 
-  void showAlertOrbe() {
-    if (!_displayed) {
-      final shouldDisplay = shouldDisplayUpgrade();
-      if (debugLogging) {
-        print('upgrader: shouldDisplayReleaseNotes: ${shouldDisplayReleaseNotes()}');
-      }
-      if (shouldDisplay && globalContext != null) {
-        _displayed = true;
-        Future.delayed(const Duration(milliseconds: 0), () {
-          showDialog(
-            barrierDismissible: canDismissDialog,
-            context: globalContext!,
-            builder: (BuildContext context) {
-              return WillPopScope(
-                onWillPop: () async => _shouldPopScope(),
-                child: _orbeDialogCustom(msgReleaseNotesTest ?? releaseNotes, context),
-              );
-            },
-          );
-        });
-      }
-    }
-  }
-
   void _showDialog(
       {required BuildContext context,
       required String? title,
@@ -590,8 +571,21 @@ class Upgrader {
           child: orbeDialogCustom
               ? _orbeDialogCustom(msgReleaseNotesTest ?? releaseNotes, context)
               : dialogStyle == UpgradeDialogStyle.material
-              ? _alertDialog(title!, message, releaseNotes, context)
-              : _cupertinoAlertDialog(title!, message, releaseNotes, context),
+                  ? _alertDialog(title!, message, releaseNotes, context)
+                  : _cupertinoAlertDialog(title!, message, releaseNotes, context),
+        );
+      },
+    );
+  }
+
+  void showOrbeAlert({required BuildContext context}) {
+    showDialog(
+      barrierDismissible: canDismissDialog,
+      context: context,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => _shouldPopScope(),
+          child: _orbeDialogCustom(msgReleaseNotesTest ?? releaseNotes, context),
         );
       },
     );
@@ -700,19 +694,30 @@ class Upgrader {
                             color: const Color(0xFF64266C),
                           ),
                         ),
-                        onPressed: () => onUserIgnored(context, true),
+                        onPressed: () {
+                          if (orbeActionButton != null) {
+                            orbeActionButton!();
+                          }
+                          onUserIgnored(context, true);
+                        },
                       ),
                     ),
                     const SizedBox(width: 24.0),
                     Expanded(
                       child: TextButton(
-                          child: Text(
-                            labelUpdateNowCustomOrbe!,
-                            style: GoogleFonts.roboto(
-                              color: const Color(0xFF64266C),
-                            ),
+                        child: Text(
+                          labelUpdateNowCustomOrbe!,
+                          style: GoogleFonts.roboto(
+                            color: const Color(0xFF64266C),
                           ),
-                          onPressed: () => onUserUpdated(context, !blocked())),
+                        ),
+                        onPressed: () {
+                          if (orbeActionButton != null) {
+                            orbeActionButton!();
+                          }
+                          onUserUpdated(context, !blocked());
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -882,7 +887,9 @@ class Upgrader {
     var prefs = await SharedPreferences.getInstance();
 
     _userIgnoredVersion = _appStoreVersion;
-    await prefs.setString('userIgnoredVersion', _userIgnoredVersion!);
+    if(_userIgnoredVersion != null){
+      await prefs.setString('userIgnoredVersion', _userIgnoredVersion!);
+    }
     return true;
   }
 
